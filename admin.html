@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Gestor - Mais Lição</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; transition: 0.3s; }
+        body.light { background: #f1f5f9; color: #1e293b; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .light .glass { background: white; border-color: rgba(0,0,0,0.1); }
+        .input-dark { background: #020617; border: 1px solid #1e293b; padding: 12px; border-radius: 12px; width: 100%; outline: none; color: white; }
+        .light .input-dark { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div id="admin-auth" class="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-6 hidden">
+        <div class="glass p-8 rounded-[2.5rem] w-full max-w-md text-center">
+            <h2 class="text-2xl font-black text-orange-500 mb-6 uppercase italic">Acesso Restrito</h2>
+            <input type="email" id="adm-email" placeholder="E-mail do Administrador" class="input-dark mb-4">
+            <input type="password" id="adm-pass" placeholder="Digite a Senha" class="input-dark mb-6 text-center">
+            <button id="btn-login-auth" class="w-full bg-orange-600 p-4 rounded-2xl font-black hover:bg-orange-500 transition-all">ENTRAR NO PAINEL</button>
+        </div>
+    </div>
+
+    <div id="painel-conteudo" class="max-w-6xl mx-auto hidden">
+        <header class="flex justify-between items-center mb-10 border-b border-orange-500/20 pb-6">
+            <div>
+                <h1 class="text-4xl font-black text-orange-500 italic uppercase">Admin Mais Lição</h1>
+                <p class="text-[10px] font-bold uppercase opacity-50 tracking-widest">Controle de Quizzes</p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <button id="btn-logout" class="text-[10px] font-bold opacity-50 hover:opacity-100 uppercase">Sair</button>
+                <button onclick="toggleTheme()" class="p-3 rounded-full glass border border-orange-500/20" id="theme-btn">🌙</button>
+            </div>
+        </header>
+
+        <div class="grid lg:grid-cols-4 gap-8">
+            <div class="lg:col-span-1 space-y-4">
+                <button onclick="prepararNovoQuiz()" class="w-full bg-orange-600 hover:bg-orange-500 p-4 rounded-2xl font-black text-xs transition-all shadow-lg shadow-orange-900/20">
+                    + CRIAR NOVO QUIZ
+                </button>
+                <div class="glass p-4 rounded-3xl">
+                    <h2 class="text-[10px] font-black text-orange-500 uppercase mb-4 tracking-widest text-center">Quizzes Ativos</h2>
+                    <div id="lista-quizzes" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <div id="editor-area" class="lg:col-span-3 glass p-6 md:p-10 rounded-[2.5rem] hidden">
+                <div class="flex justify-between items-start mb-8">
+                    <h2 class="text-2xl font-black text-white uppercase italic">Editor</h2>
+                    <button onclick="abrirModalIA()" class="text-[10px] bg-blue-600/20 text-blue-400 border border-blue-500/30 px-4 py-2 rounded-full font-black hover:bg-blue-600 hover:text-white transition-all">✨ IMPORTAR IA</button>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-4 mb-6">
+                    <div class="md:col-span-2">
+                        <label class="text-[10px] font-black uppercase opacity-50 ml-2">Título do Quiz</label>
+                        <input type="text" id="q-id" class="input-dark mt-1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-black uppercase opacity-50 ml-2">Status</label>
+                        <select id="q-status" class="input-dark mt-1">
+                            <option value="fechado">🔴 FECHADO</option>
+                            <option value="aberto">🟢 ABERTO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="glass p-4 rounded-2xl mb-8 border-orange-500/20 border">
+                    <label class="text-[10px] font-black uppercase text-orange-500">Senha do Diretor para este Quiz</label>
+                    <input type="text" id="senha-diretor" class="input-dark mt-1" placeholder="Ex: amem">
+                </div>
+
+                <div id="perguntas-lista" class="space-y-12"></div>
+
+                <div class="mt-12 flex gap-4">
+                    <button id="btn-salvar" class="flex-1 bg-orange-600 p-5 rounded-2xl font-black text-xl hover:bg-orange-500 transition-all">SALVAR ALTERAÇÕES</button>
+                    <button id="btn-excluir" class="hidden bg-red-950 text-red-500 px-8 rounded-2xl font-bold border border-red-500/20">EXCLUIR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-ia" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass max-w-2xl w-full p-8 rounded-[2rem]">
+            <h3 class="text-xl font-black text-orange-500 uppercase italic mb-4">Importar JSON</h3>
+            <textarea id="json-input" class="input-dark h-64 font-mono text-xs mb-6" placeholder='[{"q": "...", "options": ["..."], "correct": 0}]'></textarea>
+            <div class="flex gap-4">
+                <button onclick="processarJSON()" class="flex-1 bg-blue-600 p-4 rounded-xl font-black text-sm">PROCESSAR</button>
+                <button onclick="fecharModalIA()" class="px-6 p-4 rounded-xl font-bold opacity-50">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVe1L7wCbAKV9o3y2skreEZA2TotxlK5w",
+            authDomain: "maislicao.firebaseapp.com",
+            projectId: "maislicao",
+            storageBucket: "maislicao.firebasestorage.app",
+            messagingSenderId: "926980749394",
+            appId: "1:926980749394:web:6d91a07b9426684e05478b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- LÓGICA DE AUTENTICAÇÃO ---
+        onAuthStateChanged(auth, (user) => {
+            if (user && user.email === "cleivecosta@gmail.com") {
+                document.getElementById('admin-auth').classList.add('hidden');
+                document.getElementById('painel-conteudo').classList.remove('hidden');
+                carregarQuizzes();
+            } else {
+                document.getElementById('admin-auth').classList.remove('hidden');
+                document.getElementById('painel-conteudo').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('btn-login-auth').addEventListener('click', async () => {
+            const email = document.getElementById('adm-email').value;
+            const pass = document.getElementById('adm-pass').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) {
+                alert("Erro: " + e.message);
+            }
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        // --- FUNÇÕES GLOBAIS (window para serem chamadas pelo HTML) ---
+        window.carregarQuizzes = async () => {
+            const container = document.getElementById('lista-quizzes');
+            const snap = await getDocs(collection(db, "quizzes"));
+            container.innerHTML = "";
+            snap.forEach(d => {
+                const q = d.data();
+                container.innerHTML += `
+                    <div onclick="editarQuiz('${d.id}')" class="p-3 rounded-xl border border-white/5 hover:border-orange-500/50 cursor-pointer bg-white/5 flex justify-between items-center transition-all">
+                        <span class="text-xs font-bold truncate">${d.id}</span>
+                        <span class="text-[8px] font-black uppercase px-2 py-1 rounded ${q.status === 'aberto' ? 'bg-green-600/20 text-green-500' : 'bg-red-600/20 text-red-500'}">
+                            ${q.status}
+                        </span>
+                    </div>
+                `;
+            });
+        };
+
+        window.renderizarCampos = (dados = []) => {
+            const container = document.getElementById('perguntas-lista');
+            container.innerHTML = "";
+            for(let i = 1; i <= 5; i++) {
+                const p = dados[i-1] || { q: '', options: ['','','','',''], correct: 0 };
+                container.innerHTML += `
+                    <div class="p-6 rounded-3xl border border-white/5 bg-white/2 relative">
+                        <span class="absolute -top-3 left-6 bg-orange-600 text-[10px] font-black px-4 py-1 rounded-full italic uppercase">Questão ${i}</span>
+                        <textarea id="q${i}-txt" class="input-dark mb-4 text-sm font-bold" rows="2" placeholder="Pergunta">${p.q}</textarea>
+                        <div class="grid gap-2">
+                            ${[0,1,2,3,4].map(idx => `
+                                <div class="flex items-center gap-3">
+                                    <span class="text-[10px] font-black opacity-30">${String.fromCharCode(65+idx)}</span>
+                                    <input type="text" id="q${i}-opt${idx}" value="${p.options[idx] || ''}" class="input-dark !p-2 text-xs">
+                                </div>
+                            `).join('')}
+                        </div>
+                        <select id="q${i}-correct" class="input-dark mt-4 !p-2 text-[10px] font-black text-orange-500 uppercase italic">
+                            ${[0,1,2,3,4].map(idx => `<option value="${idx}" ${p.correct == idx ? 'selected' : ''}>Gabarito: ${String.fromCharCode(65+idx)}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+        };
+
+        window.prepararNovoQuiz = () => {
+            document.getElementById('editor-area').classList.remove('hidden');
+            document.getElementById('btn-excluir').classList.add('hidden');
+            document.getElementById('q-id').value = "";
+            document.getElementById('q-id').disabled = false;
+            document.getElementById('senha-diretor').value = "";
+            renderizarCampos();
+        };
+
+        window.editarQuiz = async (id) => {
+            const quizDoc = await getDoc(doc(db, "quizzes", id));
+            const gabDoc = await getDoc(doc(db, "gabaritos", id));
+            const quiz = quizDoc.data();
+            const gabarito = gabDoc.exists() ? gabDoc.data().respostas : [];
+
+            document.getElementById('editor-area').classList.remove('hidden');
+            document.getElementById('btn-excluir').classList.remove('hidden');
+            document.getElementById('q-id').value = id;
+            document.getElementById('q-id').disabled = true;
+            document.getElementById('q-status').value = quiz.status || "fechado";
+            document.getElementById('senha-diretor').value = quiz.senhaAcesso || "";
+            
+            const perguntasCompletas = quiz.perguntas.map((p, i) => ({ ...p, correct: gabarito[i] }));
+            renderizarCampos(perguntasCompletas);
+        };
+
+        document.getElementById('btn-salvar').addEventListener('click', async () => {
+            const id = document.getElementById('q-id').value.trim();
+            if(!id) return alert("Digite o título do Quiz!");
+
+            const btn = document.getElementById('btn-salvar');
+            btn.innerText = "SALVANDO...";
+            btn.disabled = true;
+
+            const perguntasPublicas = [];
+            const gabaritoPrivado = [];
+
+            for(let i=1; i<=5; i++){
+                perguntasPublicas.push({
+                    q: document.getElementById(`q${i}-txt`).value,
+                    options: [
+                        document.getElementById(`q${i}-opt0`).value,
+                        document.getElementById(`q${i}-opt1`).value,
+                        document.getElementById(`q${i}-opt2`).value,
+                        document.getElementById(`q${i}-opt3`).value,
+                        document.getElementById(`q${i}-opt4`).value
+                    ]
+                });
+                gabaritoPrivado.push(parseInt(document.getElementById(`q${i}-correct`).value));
+            }
+
+            try {
+                await setDoc(doc(db, "quizzes", id), {
+                    status: document.getElementById('q-status').value,
+                    senhaAcesso: document.getElementById('senha-diretor').value,
+                    perguntas: perguntasPublicas
+                });
+                await setDoc(doc(db, "gabaritos", id), { respostas: gabaritoPrivado });
+                alert("✅ Quiz Salvo!");
+                carregarQuizzes();
+                document.getElementById('editor-area').classList.add('hidden');
+            } catch (e) { alert("Erro ao salvar: " + e.message); }
+            finally { btn.innerText = "SALVAR ALTERAÇÕES"; btn.disabled = false; }
+        });
+
+        document.getElementById('btn-excluir').addEventListener('click', async () => {
+            const id = document.getElementById('q-id').value;
+            if(confirm("Deseja apagar este quiz para sempre?")) {
+                await deleteDoc(doc(db, "quizzes", id));
+                await deleteDoc(doc(db, "gabaritos", id));
+                carregarQuizzes();
+                document.getElementById('editor-area').classList.add('hidden');
+            }
+        });
+
+        window.abrirModalIA = () => document.getElementById('modal-ia').classList.remove('hidden');
+        window.fecharModalIA = () => document.getElementById('modal-ia').classList.add('hidden');
+        window.processarJSON = () => {
+            try {
+                const dados = JSON.parse(document.getElementById('json-input').value);
+                renderizarCampos(dados);
+                fecharModalIA();
+            } catch (e) { alert("JSON Inválido"); }
+        };
+
+        window.toggleTheme = () => {
+            document.body.classList.toggle('light');
+            document.getElementById('theme-btn').innerText = document.body.classList.contains('light') ? '☀️' : '🌙';
+        };
+
+    </script>
+</body>
+</html>

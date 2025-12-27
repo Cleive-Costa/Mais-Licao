@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desafio - Mais Lição</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: white; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .option-btn { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); padding: 18px; border-radius: 20px; width: 100%; text-align: left; transition: 0.2s; font-size: 14px; }
+        .option-btn:hover { border-color: #f97316; background: rgba(249, 115, 22, 0.1); }
+        .option-btn.selected { border-color: #f97316; background: #f97316; color: white; font-weight: 900; }
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #f97316; transition: 0.3s; width: 0%; }
+    </style>
+</head>
+<body>
+
+    <div id="quiz-ui" class="w-full max-w-xl">
+        <div class="glass p-8 rounded-[3rem]">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="q-label" class="text-xl font-black italic uppercase text-orange-500">Questão 01</h2>
+                <div id="timer" class="font-mono font-black text-xl">00:00</div>
+            </div>
+            <div class="progress-bar mb-8">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="q-text" class="text-lg font-bold mb-8">...</p>
+            <div id="options-list" class="space-y-3 mb-10"></div>
+            <button id="btn-next" onclick="proximaQuestao()" class="w-full bg-orange-600 p-5 rounded-2xl font-black uppercase">Próxima</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVe1L7wCbAKV9o3y2skreEZA2TotxlK5w",
+            authDomain: "maislicao.firebaseapp.com",
+            projectId: "maislicao",
+            storageBucket: "maislicao.firebasestorage.app",
+            messagingSenderId: "926980749394",
+            appId: "1:926980749394:web:6d91a07b9426684e05478b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        let activeId = localStorage.getItem('active_quiz');
+        let quizPerguntas = [];
+        let index = 0;
+        let respostas = [];
+        let tempoInicio, intervalo;
+
+        onAuthStateChanged(auth, async (user) => {
+            if(!user || !activeId) return window.location.href = 'index.html';
+            const s = await getDoc(doc(db, "quizzes", activeId));
+            if(s.exists()){
+                quizPerguntas = s.data().perguntas;
+                start();
+            }
+        });
+
+        function start() {
+            tempoInicio = Date.now();
+            intervalo = setInterval(() => {
+                const seg = Math.floor((Date.now() - tempoInicio) / 1000);
+                document.getElementById('timer').innerText = `${Math.floor(seg/60).toString().padStart(2,'0')}:${(seg%60).toString().padStart(2,'0')}`;
+            }, 1000);
+            render();
+        }
+
+        function render() {
+            const q = quizPerguntas[index];
+            document.getElementById('q-label').innerText = `Questão ${index + 1}`;
+            document.getElementById('q-text').innerText = q.text;
+            document.getElementById('progress-fill').style.width = `${((index + 1) / quizPerguntas.length) * 100}%`;
+            
+            const area = document.getElementById('options-list');
+            area.innerHTML = "";
+            q.options.forEach((opt, i) => {
+                const b = document.createElement('button');
+                b.className = "option-btn";
+                b.innerText = opt;
+                b.onclick = () => {
+                    document.querySelectorAll('.option-btn').forEach(el => el.classList.remove('selected'));
+                    b.classList.add('selected');
+                    respostas[index] = i;
+                };
+                area.appendChild(b);
+            });
+            document.getElementById('btn-next').innerText = index === quizPerguntas.length - 1 ? "Finalizar" : "Próxima";
+        }
+
+        window.proximaQuestao = () => {
+            if(respostas[index] === undefined) return alert("Escolha uma resposta!");
+            if(index < quizPerguntas.length - 1) { index++; render(); } 
+            else { salvarResultado(); }
+        };
+
+        async function salvarResultado() {
+            clearInterval(intervalo);
+            const tempoFinal = Math.floor((Date.now() - tempoInicio) / 1000);
+            let acertos = 0;
+            quizPerguntas.forEach((q, i) => { if(respostas[i] === q.correct) acertos++; });
+
+            const uid = auth.currentUser.uid;
+            
+            // 1. Salva participação
+            await setDoc(doc(db, "participacoes", `${uid}_${activeId}`), {
+                acertos: acertos, tempo: tempoFinal, data: serverTimestamp()
+            });
+
+            // 2. Atualiza Ranking Acumulado
+            const rRef = doc(db, "ranking_acumulado", uid);
+            const rSnap = await getDoc(rRef);
+            if(rSnap.exists()){
+                await setDoc(rRef, {
+                    acertos: (rSnap.data().acertos || 0) + acertos,
+                    tempo: (rSnap.data().tempo || 0) + tempoFinal
+                }, { merge: true });
+            }
+
+            alert(`Fim! Acertos: ${acertos}/5`);
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mais Lição - Quiz Aluno</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; transition: background 0.4s; margin: 0; min-height: 100vh; background: #0f172a; color: white; }
+        body.light { background: #f1f5f9; color: #1e293b; }
+        .glass { backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); }
+        .light .glass { background: white; border-color: rgba(0,0,0,0.1); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .input-dark { background: #020617; border: 1px solid #1e293b; padding: 14px; border-radius: 16px; width: 100%; outline: none; color: white; }
+        .light .input-dark { background: #f8fafc; border-color: #cbd5e1; color: #1e293b; }
+        .btn-orange { background: #f97316; color: white; font-weight: 900; transition: 0.3s; }
+        .btn-orange:hover { background: #ea580c; transform: translateY(-2px); }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+
+    <button onclick="window.toggleTheme()" class="fixed top-6 right-6 z-50 p-3 rounded-full glass border border-orange-500/20 shadow-lg">
+        <span id="theme-icon">🌙</span>
+    </button>
+
+    <div id="app" class="w-full max-w-xl">
+        <div class="text-center mb-10">
+            <h1 class="text-5xl font-black text-orange-500 italic uppercase tracking-tighter">MAIS LIÇÃO</h1>
+            <p class="text-[10px] opacity-40 font-bold uppercase tracking-[0.3em] mt-2">Escola Sabatina Jovem</p>
+        </div>
+
+        <div id="auth-screen" class="glass p-8 rounded-[2.5rem]">
+            <div id="login-form">
+                <h2 class="text-xl font-black mb-6 italic uppercase text-orange-500">Acesso Aluno</h2>
+                <div class="space-y-4">
+                    <input type="email" id="login-email" placeholder="E-mail" class="input-dark">
+                    <input type="password" id="login-pass" placeholder="Senha" class="input-dark">
+                    <button id="btn-entrar" class="w-full btn-orange py-4 rounded-2xl uppercase text-xs">Entrar</button>
+                    <button onclick="window.toggleAuth('cadastro')" class="w-full text-[10px] font-bold opacity-50 uppercase hover:text-orange-500">Não tenho conta / Criar Cadastro</button>
+                </div>
+            </div>
+
+            <div id="register-form" class="hidden">
+                <h2 class="text-xl font-black mb-6 italic uppercase text-orange-500">Novo Cadastro</h2>
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="reg-nome" placeholder="Nome" class="input-dark">
+                        <input type="text" id="reg-sobre" placeholder="Sobrenome" class="input-dark">
+                    </div>
+                    <input type="email" id="reg-email" placeholder="E-mail" class="input-dark">
+                    <select id="reg-igreja" class="input-dark" onchange="window.checkIgreja(this.value)">
+                        <option value="" disabled selected>Sua Igreja</option>
+                        <option value="Central">Central</option>
+                        <option value="Esperança 3">Esperança 3</option>
+                        <option value="Jardim Planalto">Jardim Planalto</option>
+                        <option value="Martinho Prado">Martinho Prado</option>
+                        <option value="Outras">Outras...</option>
+                    </select>
+                    <input type="text" id="reg-outra-igreja" placeholder="Qual sua igreja?" class="input-dark hidden">
+                    <input type="password" id="reg-pass" placeholder="Senha (mín. 6 dígitos)" class="input-dark">
+                    <button id="btn-cadastrar" class="w-full btn-orange py-4 rounded-2xl uppercase text-xs mt-2">Finalizar Cadastro</button>
+                    <button onclick="window.toggleAuth('login')" class="w-full text-[10px] font-bold opacity-50 uppercase">Já tenho conta / Voltar</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="app-content" class="hidden">
+            <header class="flex justify-between items-end mb-8 px-2">
+                <div>
+                    <h2 class="text-3xl font-black italic uppercase leading-none">Olá, <span id="user-name" class="text-orange-500">...</span></h2>
+                    <p id="user-igreja" class="text-[10px] font-bold opacity-40 uppercase tracking-widest mt-2"></p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="window.location.href='ranking.html'" class="text-[10px] font-black opacity-50 hover:opacity-100 uppercase">Ranking</button>
+                    <button id="btn-logout" class="text-[10px] font-black opacity-30 hover:opacity-100 uppercase">Sair</button>
+                </div>
+            </header>
+            
+            <div class="border-l-4 border-orange-500 pl-4 mb-6">
+                <h3 class="text-sm font-black uppercase tracking-widest italic">Desafios Semanais</h3>
+            </div>
+
+            <div id="quiz-container" class="space-y-4">
+                </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCVe1L7wCbAKV9o3y2skreEZA2TotxlK5w",
+            authDomain: "maislicao.firebaseapp.com",
+            projectId: "maislicao",
+            storageBucket: "maislicao.firebasestorage.app",
+            messagingSenderId: "926980749394",
+            appId: "1:926980749394:web:6d91a07b9426684e05478b"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- FUNÇÕES GLOBAIS (CONECTADAS À WINDOW) ---
+
+        window.toggleAuth = (mode) => {
+            document.getElementById('login-form').classList.toggle('hidden', mode !== 'login');
+            document.getElementById('register-form').classList.toggle('hidden', mode !== 'cadastro');
+        };
+
+        window.checkIgreja = (val) => {
+            document.getElementById('reg-outra-igreja').classList.toggle('hidden', val !== 'Outras');
+        };
+
+        window.toggleTheme = () => {
+            const isLight = document.body.classList.toggle('light');
+            document.getElementById('theme-icon').innerText = isLight ? '☀️' : '🌙';
+        };
+
+        window.abrirQuiz = async (id) => {
+            try {
+                const configSnap = await getDoc(doc(db, "configuracao", "geral"));
+                const senhaMestra = configSnap.exists() ? configSnap.data().senhaDiretor : "950";
+                
+                const pass = prompt("Digite a Senha do Diretor para liberar o desafio:");
+                
+                if (pass === senhaMestra) {
+                    localStorage.setItem('active_quiz', id);
+                    window.location.href = "responder.html";
+                } else if (pass !== null) {
+                    alert("Senha incorreta!");
+                }
+            } catch (err) {
+                alert("Erro ao validar acesso.");
+            }
+        };
+
+        // --- LÓGICA DE AUTH ---
+
+        document.getElementById('btn-entrar').onclick = async () => {
+            const e = document.getElementById('login-email').value;
+            const p = document.getElementById('login-pass').value;
+            try { await signInWithEmailAndPassword(auth, e, p); } catch(err) { alert("E-mail ou senha inválidos."); }
+        };
+
+        document.getElementById('btn-cadastrar').onclick = async () => {
+            const n = document.getElementById('reg-nome').value.trim();
+            const s = document.getElementById('reg-sobre').value.trim();
+            const e = document.getElementById('reg-email').value.trim();
+            const p = document.getElementById('reg-pass').value;
+            let i = document.getElementById('reg-igreja').value;
+            if(i === 'Outras') i = document.getElementById('reg-outra-igreja').value.trim();
+
+            if(!n || !e || !p || !i) return alert("Preencha todos os campos!");
+            if(p.length < 6) return alert("A senha deve ter no mínimo 6 dígitos.");
+
+            try {
+                const cred = await createUserWithEmailAndPassword(auth, e, p);
+                // Dados básicos do usuário
+                await setDoc(doc(db, "usuarios", cred.user.uid), { nome: n, sobrenome: s, email: e, igreja: i });
+                // Entrada no Ranking Acumulado
+                await setDoc(doc(db, "ranking_acumulado", cred.user.uid), { 
+                    nome: n + " " + s, 
+                    igreja: i, 
+                    acertos: 0, 
+                    tempo: 0 
+                });
+            } catch(err) { alert("Erro ao criar conta. Tente outro e-mail."); }
+        };
+
+        document.getElementById('btn-logout').onclick = () => signOut(auth);
+
+        // --- MONITOR DE ESTADO ---
+
+        onAuthStateChanged(auth, async (user) => {
+            const authScreen = document.getElementById('auth-screen');
+            const appContent = document.getElementById('app-content');
+
+            if (user) {
+                authScreen.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                
+                const uDoc = await getDoc(doc(db, "usuarios", user.uid));
+                if(uDoc.exists()) {
+                    document.getElementById('user-name').innerText = uDoc.data().nome;
+                    document.getElementById('user-igreja').innerText = "Igreja: " + uDoc.data().igreja;
+                }
+                carregarQuizzes(user.uid);
+            } else {
+                authScreen.classList.remove('hidden');
+                appContent.classList.add('hidden');
+            }
+        });
+
+        async function carregarQuizzes(uid) {
+            const container = document.getElementById('quiz-container');
+            container.innerHTML = "<p class='opacity-40 italic text-center py-10 uppercase text-[10px] font-bold tracking-widest'>Buscando lições disponíveis...</p>";
+            
+            try {
+                const snap = await getDocs(collection(db, "quizzes"));
+                container.innerHTML = "";
+                
+                if (snap.empty) {
+                    container.innerHTML = "<p class='text-center opacity-30 p-10 uppercase text-xs'>Nenhum desafio no momento.</p>";
+                    return;
+                }
+
+                for (const qDoc of snap.docs) {
+                    const quiz = qDoc.data();
+                    const qId = qDoc.id;
+                    
+                    // Checar se o usuário já participou deste quiz específico
+                    const partSnap = await getDoc(doc(db, "participacoes", `${uid}_${qId}`));
+                    
+                    const card = document.createElement('div');
+                    card.className = "glass p-6 rounded-[2.5rem] flex justify-between items-center transition-all border border-white/5 hover:border-orange-500/30";
+                    
+                    let statusHtml = "";
+
+                    if (partSnap.exists()) {
+                        // JÁ RESPONDEU
+                        const dados = partSnap.data();
+                        statusHtml = `
+                            <div class="text-right">
+                                <span class="text-green-500 font-black text-[10px] uppercase">Respondido</span>
+                                <div class="text-2xl font-black">${dados.acertos}/5</div>
+                            </div>`;
+                    } else if (quiz.status === "fechado") {
+                        // QUIZ FECHADO PELO ADMIN
+                        statusHtml = `<span class="text-slate-500 font-black text-[10px] uppercase opacity-40">Fechado</span>`;
+                    } else {
+                        // DISPONÍVEL
+                        statusHtml = `<button onclick="window.abrirQuiz('${qId}')" class="btn-orange px-8 py-3 rounded-xl text-[10px] uppercase shadow-lg shadow-orange-900/20">Jogar</button>`;
+                    }
+
+                    card.innerHTML = `
+                        <div>
+                            <p class="text-[8px] font-bold text-orange-500 uppercase tracking-widest mb-1">Missão Semanal</p>
+                            <h4 class="text-xl font-black italic uppercase">${quiz.tema || qId}</h4>
+                        </div>
+                        ${statusHtml}
+                    `;
+                    container.appendChild(card);
+                }
+            } catch (err) {
+                container.innerHTML = "<p class='text-center text-red-500 p-10'>Erro ao carregar dados.</p>";
+            }
+        }
+    </script>
+</body>
+</html>
