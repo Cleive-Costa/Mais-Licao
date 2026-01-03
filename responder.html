@@ -53,16 +53,26 @@
 
         let activeId = localStorage.getItem('active_quiz');
         let quizPerguntas = [];
+        let gabaritoOficial = []; // Nova variável para armazenar as respostas corretas
         let index = 0;
         let respostas = [];
         let tempoInicio, intervalo;
 
         onAuthStateChanged(auth, async (user) => {
             if(!user || !activeId) return window.location.href = 'index.html';
+            
+            // Busca as perguntas (públicas)
             const s = await getDoc(doc(db, "quizzes", activeId));
-            if(s.exists()){
+            // Busca o gabarito (privado) - Guardado na coleção 'gabaritos' pelo admin.html
+            const g = await getDoc(doc(db, "gabaritos", activeId));
+
+            if(s.exists() && g.exists()){
                 quizPerguntas = s.data().perguntas;
+                gabaritoOficial = g.data().respostas; // Carrega o array de respostas (0, 1, 2...)
                 start();
+            } else {
+                alert("Erro ao carregar dados do desafio.");
+                window.location.href = 'index.html';
             }
         });
 
@@ -78,7 +88,7 @@
         function render() {
             const q = quizPerguntas[index];
             document.getElementById('q-label').innerText = `Questão ${index + 1}`;
-            document.getElementById('q-text').innerText = q.text;
+            document.getElementById('q-text').innerText = q.q || q.text; // Ajuste para ler 'q' ou 'text'
             document.getElementById('progress-fill').style.width = `${((index + 1) / quizPerguntas.length) * 100}%`;
             
             const area = document.getElementById('options-list');
@@ -106,28 +116,40 @@
         async function salvarResultado() {
             clearInterval(intervalo);
             const tempoFinal = Math.floor((Date.now() - tempoInicio) / 1000);
+            
+            // LÓGICA CORRIGIDA: Compara a resposta do aluno com o gabaritoOficial
             let acertos = 0;
-            quizPerguntas.forEach((q, i) => { if(respostas[i] === q.correct) acertos++; });
+            respostas.forEach((respAluno, i) => {
+                if(respAluno === gabaritoOficial[i]) acertos++;
+            });
 
             const uid = auth.currentUser.uid;
             
-            // 1. Salva participação
-            await setDoc(doc(db, "participacoes", `${uid}_${activeId}`), {
-                acertos: acertos, tempo: tempoFinal, data: serverTimestamp()
-            });
+            try {
+                // 1. Salva participação individual
+                await setDoc(doc(db, "participacoes", `${uid}_${activeId}`), {
+                    acertos: acertos, 
+                    tempo: tempoFinal, 
+                    data: serverTimestamp()
+                });
 
-            // 2. Atualiza Ranking Acumulado
-            const rRef = doc(db, "ranking_acumulado", uid);
-            const rSnap = await getDoc(rRef);
-            if(rSnap.exists()){
-                await setDoc(rRef, {
-                    acertos: (rSnap.data().acertos || 0) + acertos,
-                    tempo: (rSnap.data().tempo || 0) + tempoFinal
-                }, { merge: true });
+                // 2. Atualiza Ranking Acumulado
+                const rRef = doc(db, "ranking_acumulado", uid);
+                const rSnap = await getDoc(rRef);
+                
+                if(rSnap.exists()){
+                    await setDoc(rRef, {
+                        acertos: (rSnap.data().acertos || 0) + acertos,
+                        tempo: (rSnap.data().tempo || 0) + tempoFinal
+                    }, { merge: true });
+                }
+
+                alert(`Fim! Acertos: ${acertos}/${quizPerguntas.length}`);
+                window.location.href = 'index.html';
+            } catch (err) {
+                console.error(err);
+                alert("Erro ao guardar resultado.");
             }
-
-            alert(`Fim! Acertos: ${acertos}/5`);
-            window.location.href = 'index.html';
         }
     </script>
 </body>

@@ -233,6 +233,7 @@
 
             try {
                 await setDoc(doc(db, "quizzes", id), {
+                    tema: id,
                     status: document.getElementById('q-status').value,
                     senhaAcesso: document.getElementById('senha-diretor').value,
                     perguntas: perguntasPublicas
