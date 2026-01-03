@@ -12,6 +12,9 @@
         .gold { color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.4); }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Ajuste para mobile não quebrar a tabela */
+        .table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-10 flex flex-col items-center">
@@ -23,17 +26,17 @@
     <div class="w-full max-w-4xl fade-in">
         <div class="flex justify-between items-end mb-10 border-b border-orange-500/30 pb-6">
             <div>
-                <h1 class="text-5xl font-black text-orange-500 italic tracking-tighter leading-none uppercase">Ranking Geral</h1>
+                <h1 class="text-3xl md:text-5xl font-black text-orange-500 italic tracking-tighter leading-none uppercase">Ranking Geral</h1>
                 <p class="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-3 italic">Acumulado do Trimestre - Apologética</p>
             </div>
             <button onclick="window.location.href='index.html'" class="text-[10px] bg-white/5 px-4 py-2 rounded-full border border-white/10 font-bold uppercase hover:bg-white/10 transition-all">Sair / Voltar</button>
         </div>
 
-        <div class="glass rounded-[2.5rem] overflow-hidden shadow-2xl">
-            <table class="w-full text-left border-collapse">
+        <div class="glass rounded-[2.5rem] overflow-hidden shadow-2xl table-container">
+            <table class="w-full text-left border-collapse min-w-[500px]">
                 <thead class="bg-orange-600 text-white text-xs uppercase tracking-widest font-black">
                     <tr>
-                        <th class="p-6">Pos</th>
+                        <th class="p-6 w-20">Pos</th>
                         <th class="p-6">Participante</th>
                         <th class="p-6">Igreja</th>
                         <th class="p-6 text-center">Acertos</th>
@@ -53,7 +56,6 @@
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import { getFirestore, collection, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // CONFIGURAÇÃO DO SEU PROJETO
         const firebaseConfig = {
             apiKey: "AIzaSyCVe1L7wCbAKV9o3y2skreEZA2TotxlK5w",
             authDomain: "maislicao.firebaseapp.com",
@@ -67,7 +69,9 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // PROTEÇÃO: SÓ ACESSA SE ESTIVER LOGADO
+        // ID do Admin que não deve aparecer no Ranking
+        const ADMIN_UID_BLOQUEADO = "kXeZRgcpdoM4GWhEIuiIV7e04sL2";
+
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('loading').classList.add('hidden');
@@ -78,15 +82,13 @@
         });
 
         function carregarRanking() {
-            // CONSULTA À COLEÇÃO ACUMULADA
             const q = query(
                 collection(db, "ranking_acumulado"), 
                 orderBy("acertos", "desc"), 
                 orderBy("tempo", "asc"), 
-                limit(50)
+                limit(55)
             );
 
-            // ESCUTA O BANCO EM TEMPO REAL
             onSnapshot(q, (snapshot) => {
                 const tbody = document.getElementById('ranking-body');
                 tbody.innerHTML = "";
@@ -96,18 +98,25 @@
                     return;
                 }
 
-                snapshot.docs.forEach((doc, index) => {
+                let posicaoExibida = 1;
+
+                snapshot.docs.forEach((doc) => {
+                    // Filtra o Admin pelo UID
+                    if (doc.id === ADMIN_UID_BLOQUEADO) return;
+                    
+                    // Limita a exibição aos top 50 alunos
+                    if (posicaoExibida > 50) return;
+
                     const data = doc.data();
-                    const isTop3 = index < 3;
+                    const isTop3 = posicaoExibida <= 3;
                     
                     tbody.innerHTML += `
                         <tr class="transition-all hover:bg-white/5 ${isTop3 ? 'bg-orange-500/5' : ''}">
-                            <td class="p-6 font-black ${index === 0 ? 'gold text-2xl' : 'text-slate-500'}">
-                                ${index + 1}º
+                            <td class="p-6 font-black ${posicaoExibida === 1 ? 'gold text-2xl' : 'text-slate-500'}">
+                                ${posicaoExibida}º
                             </td>
                             <td class="p-6">
                                 <div class="font-bold text-white text-lg leading-tight">${data.nome || 'Anônimo'}</div>
-                                <div class="text-[9px] text-slate-500 uppercase font-bold tracking-tighter mt-1">${data.distrito || 'Sem Distrito'}</div>
                             </td>
                             <td class="p-6 text-xs text-orange-500/80 font-black uppercase italic">
                                 ${data.igreja || '-'}
@@ -122,12 +131,10 @@
                             </td>
                         </tr>
                     `;
+                    posicaoExibida++;
                 });
             }, (error) => {
                 console.error("Erro no Ranking:", error);
-                if(error.code === 'failed-precondition') {
-                    alert("O Firebase precisa criar um índice. Verifique o console (F12) e clique no link azul que aparecer.");
-                }
             });
         }
     </script>
